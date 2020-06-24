@@ -29,7 +29,19 @@ async def handle_post_register(request):
             break   
         if part.filename is not None:
             filedata = cv2.imdecode(np.frombuffer(await part.read(), np.uint8), cv2.IMREAD_COLOR)
-    return web.Response(text='OK') # TODO register   
+    return web.Response(text='OK') # TODO register 
+
+@routes.post('/update')
+async def handle_post_register(request):
+    reader = await request.multipart()
+    filedata = None
+    while True:
+        part = await reader.next()
+        if part is None:
+            break   
+        if part.filename is not None:
+            filedata = cv2.imdecode(np.frombuffer(await part.read(), np.uint8), cv2.IMREAD_COLOR)
+    return web.Response(text='OK') # TODO update      
 
 app = web.Application()
 app.add_routes(routes)
