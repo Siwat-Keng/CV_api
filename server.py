@@ -32,7 +32,7 @@ async def handle_post_register(request):
     return web.Response(text='OK') # TODO register 
 
 @routes.post('/update')
-async def handle_post_register(request):
+async def handle_post_update(request):
     reader = await request.multipart()
     filedata = None
     while True:
