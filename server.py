@@ -1,47 +1,48 @@
 from aiohttp import web
-import numpy as np
-import cv2, aiohttp, json
+import aiohttp, mysql.connector
 
 routes = web.RouteTableDef()
+# db = mysql.connector.connect(
+#   host="",
+#   user="",
+#   password=""
+# )
+# cursor = db.cursor()
+ENDPOINT_URL = 'http://161.200.92.135/projects/faceapi/detect'
 
 @routes.post('/check')
 async def handle_post_check(request):
-    reader = await request.multipart()
-    metadata = None
-    filedata = None
-    while True:
-        part = await reader.next()
-        if part is None:
-            break   
-        if part.filename is not None:
-            filedata = cv2.imdecode(np.frombuffer(await part.read(), np.uint8), cv2.IMREAD_COLOR)
-        else:
-            metadata = await part.text()
     return web.Response(text='OK') # TODO check
 
 @routes.post('/register')
 async def handle_post_register(request):
     reader = await request.multipart()
     filedata = None
+    userID = request.headers['userID']
+    domainName = request.headers['domainName']
+    print('userID : {}\ndomainName : {}'.format(userID, domainName))
     while True:
         part = await reader.next()
         if part is None:
             break   
-        if part.filename is not None:
-            filedata = cv2.imdecode(np.frombuffer(await part.read(), np.uint8), cv2.IMREAD_COLOR)
-    return web.Response(text='OK') # TODO register 
+        if part.filename:
+            filedata = await part.read()
+    if filedata is not None:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(ENDPOINT_URL, data={'image':filedata}) as resp:    
+                r = await resp.json()
+                # cursor.execute("")
+                return web.json_response(r) # TODO register 
+    else:
+        return web.Response(text='Input Error')
 
 @routes.post('/update')
 async def handle_post_update(request):
-    reader = await request.multipart()
-    filedata = None
-    while True:
-        part = await reader.next()
-        if part is None:
-            break   
-        if part.filename is not None:
-            filedata = cv2.imdecode(np.frombuffer(await part.read(), np.uint8), cv2.IMREAD_COLOR)
     return web.Response(text='OK') # TODO update      
+
+@routes.delete('/delete')
+async def handle_delete(request):
+    return web.Response(text='OK')
 
 app = web.Application()
 app.add_routes(routes)
