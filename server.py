@@ -1,4 +1,4 @@
-from aiohttp import web, ClientSession
+from aiohttp import web, MultipartReader, ClientSession
 from scipy.spatial.distance import cdist
 import mysql.connector, numpy as np
 
@@ -30,26 +30,46 @@ def computeDist(responseDict, storeEmbeddings, storeLabels, DECISION_THRES=0.85)
 
 @routes.post('/check')
 async def handle_post_check(request):
-    return web.Response(text='OK') # TODO check
+    reader = await request.multipart()
+    filedata = None
+    userID = None
+    domainName = None
+    while True:
+        part = await reader.next()
+        if part is None:
+            break
+        if part.name == 'image':
+            filedata = await part.read()
+        elif part.name == 'userID':
+            userID = await part.text()
+        elif part.name == 'domainName':
+            domainName = await part.text()
+    if filedata is None or not userID or not domainName:
+        return web.json_response({'status': 'ERR_INVALID_REQUEST',
+        'message': 'Invalid Input.'})
+    else:
+        return web.json_response({}) # TODO check
 
 @routes.post('/register')
 async def handle_post_register(request):
     reader = await request.multipart()
     filedata = None
-    try:
-        userID = request.headers['userID']
-        domainName = request.headers['domainName']
-        print('userID : {}\ndomainName : {}'.format(userID, domainName))
-    except KeyError:
-        return web.json_response({'status': 'ERR_INVALID_REQUEST',
-        'message': 'Headers require userID and domainName.'})
+    userID = None
+    domainName = None
     while True:
         part = await reader.next()
         if part is None:
-            break   
-        if part.filename:
+            break
+        if part.name == 'image':
             filedata = await part.read()
-    if filedata is not None:
+        elif part.name == 'userID':
+            userID = await part.text()
+        elif part.name == 'domainName':
+            domainName = await part.text()
+    if filedata is None or not userID or not domainName:
+        return web.json_response({'status': 'ERR_INVALID_REQUEST',
+        'message': 'Invalid Input.'})
+    else:
         async with ClientSession() as session:
             async with session.post(ENDPOINT_URL, data={'image':filedata}) as resp:
                 if resp.status == 200: 
@@ -58,28 +78,27 @@ async def handle_post_register(request):
                     return web.json_response({'status': r['status']})
                 else:
                     return web.json_response({'status': resp.status})
-    else:
-        return web.json_response({'status': 'ERR_INVALID_REQUEST',
-        'message': 'No image found.'})
 
 @routes.post('/update')
 async def handle_post_update(request):
     reader = await request.multipart()
     filedata = None
-    try:
-        userID = request.headers['userID']
-        domainName = request.headers['domainName']
-        print('userID : {}\ndomainName : {}'.format(userID, domainName))
-    except KeyError:
-        return web.json_response({'status': 'ERR_INVALID_REQUEST',
-        'message': 'Headers require userID and domainName.'})
+    userID = None
+    domainName = None
     while True:
         part = await reader.next()
         if part is None:
-            break   
-        if part.filename:
+            break
+        if part.name == 'image':
             filedata = await part.read()
-    if filedata is not None:
+        elif part.name == 'userID':
+            userID = await part.text()
+        elif part.name == 'domainName':
+            domainName = await part.text()
+    if filedata is None or not userID or not domainName:
+        return web.json_response({'status': 'ERR_INVALID_REQUEST',
+        'message': 'Invalid Input.'})
+    else:
         async with ClientSession() as session:
             async with session.post(ENDPOINT_URL, data={'image':filedata}) as resp:
                 if resp.status == 200: 
@@ -88,9 +107,6 @@ async def handle_post_update(request):
                     return web.json_response({'status': r['status']})
                 else:
                     return web.json_response({'status': resp.status})
-    else:
-        return web.json_response({'status': 'ERR_INVALID_REQUEST',
-        'message': 'No image found.'})
 
 @routes.delete('/delete')
 async def handle_delete(request):
