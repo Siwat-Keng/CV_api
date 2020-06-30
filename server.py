@@ -4,11 +4,15 @@ import mysql.connector, numpy as np
 
 routes = web.RouteTableDef()
 # db = mysql.connector.connect(
-#   host="",
-#   user="",
-#   password=""
+#   host = "localhost",
+#   user = "root",
+#   password = "password",
+#   database = "cvapi",
+#   port = 3306
 # )
+
 # cursor = db.cursor()
+# cursor.execute("CREATE TABLE")
 ENDPOINT_URL = 'http://161.200.92.135/projects/faceapi/detect'
 
 def computeDist(responseDict, storeEmbeddings, storeLabels, DECISION_THRES=0.85):
