@@ -3,7 +3,6 @@ from scipy.spatial.distance import cdist
 import mysql.connector, numpy as np, json
 
 routes = web.RouteTableDef()
-<<<<<<< HEAD
 DATABASE_NAME = 'testDB' # param 
 TABLE_NAME = 'testdata' # param 
 db = mysql.connector.connect(
@@ -13,40 +12,11 @@ db = mysql.connector.connect(
   database=DATABASE_NAME
 )
 cursor = db.cursor()
-=======
-# db = mysql.connector.connect(
-#   host = "localhost",
-#   user = "root",
-#   password = "password",
-#   database = "cvapi",
-#   port = 3306
-# )
-
-# cursor = db.cursor()
-# cursor.execute("CREATE TABLE")
->>>>>>> 495e3cdd9a2a4f98b9918bfdb80b258204253731
 ENDPOINT_URL = 'http://161.200.92.135/projects/faceapi/detect'
 
 # set up code (first use)
 # cursor.execute("CREATE DATABASE {}".format(DATABASE_NAME))
 # cursor.execute("CREATE TABLE {} (domainName VARCHAR(255), userID VARCHAR(255), embedding JSON)".format(TABLE_NAME))
-
-def computeDist(responseDict, storeEmbeddings, storeLabels, DECISION_THRES=0.85):
-    responseEmbedding = np.array([face['embedding'] for face in responseDict['faces']])
-    if responseEmbedding.shape[0] > 0:
-        dist2Store = cdist(responseEmbedding, storeEmbeddings)
-        minIdx = np.argmin(dist2Store, axis=1)
-        minDist = np.min(dist2Store, axis=1)
-
-        for distIdx, dist in enumerate(minDist): 
-            if dist <= DECISION_THRES:
-                responseDict['faces'][distIdx]['label'] = storeLabels[minIdx[distIdx]]
-            else: 
-                responseDict['faces'][distIdx]['label'] = 'unknown'
-
-        return responseDict
-    else:
-        return None
 
 @routes.post('/check')
 async def handle_post_check(request):
@@ -54,6 +24,7 @@ async def handle_post_check(request):
     filedata = None
     userID = None
     domainName = None
+    decisionThres = 0.85
     while True:
         part = await reader.next()
         if part is None:
@@ -64,11 +35,31 @@ async def handle_post_check(request):
             userID = await part.text()
         elif part.name == 'domainName':
             domainName = await part.text()
+        elif part.name == 'thres':
+           decisionThres = int(await part.text())
     if filedata is None or not userID or not domainName:
-        return web.json_response({'status': 'ERR_INVALID_REQUEST',
-        'message': 'Require image, userID and domainName.'})
+        return web.HTTPBadRequest(reason='Require image, userID and domainName.')
     else:
-        return web.json_response({}) # TODO check
+        regCheck = "SELECT embedding FROM {} WHERE domainName = %s AND userID = %s".format(TABLE_NAME)
+        cursor.execute(regCheck, (domainName, userID))
+        result = cursor.fetchone()
+        if result:
+            result = np.array([json.loads(result[0])])
+            async with ClientSession() as session:
+                async with session.post(ENDPOINT_URL, data={'image':filedata}) as resp:
+                    if resp.status == 200: 
+                        r = await resp.json()
+                        if r['status'] != 'OK':               
+                            return web.HTTPBadRequest(reason='API Error')  
+                        elif len(r['faces']) == 1:
+                            embedding = np.array([r['faces'][0]['embedding']])
+                            return web.json_response({'result': str(np.min(cdist(embedding, result), axis=1)[0] <= decisionThres)})    
+                        else:
+                            return web.HTTPBadRequest(reason='{} faces found.'.format(len(r['faces'])))             
+                    else:
+                        return web.HTTPBadRequest(reason='API status : {}'.format(resp.status))                                                                   
+        else:
+            return web.HTTPNotFound()
 
 @routes.post('/register')
 async def handle_post_register(request):
@@ -107,7 +98,7 @@ async def handle_post_register(request):
                             db.commit()     
                             return web.json_response({'status': r['status']})
                         else:
-                            return web.HTTPBadRequest(reason='{} people found.'.format(len(r['faces'])))
+                            return web.HTTPBadRequest(reason='{} faces found.'.format(len(r['faces'])))
                     else:
                         return web.HTTPBadRequest(reason='API status : {}'.format(resp.status))           
         else:
