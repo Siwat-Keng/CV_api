@@ -40,8 +40,8 @@ async def handle_post_check(request):
     if filedata is None or not userID or not domainName:
         return web.HTTPBadRequest(reason='Require image, userID and domainName.')
     else:
-        regCheck = "SELECT embedding FROM {} WHERE domainName = %s AND userID = %s".format(TABLE_NAME)
-        cursor.execute(regCheck, (domainName, userID))
+        check = "SELECT embedding FROM {} WHERE domainName = %s AND userID = %s".format(TABLE_NAME)
+        cursor.execute(check, (domainName, userID))
         result = cursor.fetchone()
         if result:
             result = np.array([json.loads(result[0])])
@@ -80,8 +80,8 @@ async def handle_post_register(request):
     if filedata is None or not userID or not domainName:
         return web.HTTPBadRequest(reason='Require image, userID and domainName.')
     else:
-        regCheck = "SELECT * FROM {} WHERE domainName = %s AND userID = %s".format(TABLE_NAME)
-        cursor.execute(regCheck, (domainName, userID))
+        check = "SELECT * FROM {} WHERE domainName = %s AND userID = %s".format(TABLE_NAME)
+        cursor.execute(check, (domainName, userID))
         result = cursor.fetchone()
         if not result:
             async with ClientSession() as session:
@@ -96,7 +96,7 @@ async def handle_post_register(request):
                             val = (domainName, userID, json.dumps(embedding))
                             cursor.execute(sql, val)                   
                             db.commit()     
-                            return web.json_response({'status': r['status']})
+                            return web.json_response({'status': 'OK'})
                         else:
                             return web.HTTPBadRequest(reason='{} faces found.'.format(len(r['faces'])))
                     else:
@@ -122,21 +122,51 @@ async def handle_post_update(request):
         elif part.name == 'domainName':
             domainName = await part.text()
     if filedata is None or not userID or not domainName:
-        return web.json_response({'status': 'ERR_INVALID_REQUEST',
-        'message': 'Require image, userID and domainName.'})
+        return web.HTTPBadRequest(reason='Require image, userID and domainName.')
     else:
-        async with ClientSession() as session:
-            async with session.post(ENDPOINT_URL, data={'image':filedata}) as resp:
-                if resp.status == 200: 
-                    r = await resp.json()
-                    # cursor.execute("") # TODO update + check if not available
-                    return web.json_response({'status': r['status']})
-                else:
-                    return web.json_response({'status': resp.status})
+        check = "SELECT * FROM {} WHERE domainName = %s AND userID = %s".format(TABLE_NAME)
+        cursor.execute(check, (domainName, userID))
+        result = cursor.fetchone()
+        if result:
+            async with ClientSession() as session:
+                async with session.post(ENDPOINT_URL, data={'image':filedata}) as resp:
+                    if resp.status == 200: 
+                        r = await resp.json()
+                        if r['status'] != 'OK':
+                            return web.HTTPBadRequest(reason='API Error')  
+                        elif len(r['faces']) == 1:
+                            embedding = r['faces'][0]['embedding']
+                            sql = "UPDATE {} SET embedding = %s WHERE domainName = %s AND userID = %s".format(TABLE_NAME)
+                            val = (json.dumps(embedding), domainName, userID)
+                            cursor.execute(sql, val)                   
+                            db.commit()     
+                            return web.json_response({'status': 'OK'})
+                        else:
+                            return web.HTTPBadRequest(reason='{} faces found.'.format(len(r['faces'])))
+                    else:
+                        return web.HTTPBadRequest(reason='API status : {}'.format(resp.status))           
+        else:
+            return web.HTTPNotFound()
 
 @routes.delete('/delete')
 async def handle_delete(request):
-    return web.Response(text='OK')
+    try:
+        js = await request.json()
+        userID = js['userID']
+        domainName = js['domainName']
+        check = "SELECT * FROM {} WHERE domainName = %s AND userID = %s".format(TABLE_NAME)
+        cursor.execute(check, (domainName, userID))
+        result = cursor.fetchone()    
+        if result:
+            sql = "DELETE FROM {} WHERE domainName = %s AND userID = %s".format(TABLE_NAME)
+            val = (domainName, userID)
+            cursor.execute(sql, val)                   
+            db.commit()        
+            return web.json_response({'status':'OK'})    
+        else:
+            return web.HTTPNotFound()
+    except Exception as err:
+        return web.HTTPBadRequest(reason=str(err)) 
 
 app = web.Application()
 app.add_routes(routes)
