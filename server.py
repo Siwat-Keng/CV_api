@@ -1,15 +1,22 @@
 from aiohttp import web, MultipartReader, ClientSession
 from scipy.spatial.distance import cdist
-import mysql.connector, numpy as np
+import mysql.connector, numpy as np, json
 
 routes = web.RouteTableDef()
-# db = mysql.connector.connect(
-#   host="",
-#   user="",
-#   password=""
-# )
-# cursor = db.cursor()
+DATABASE_NAME = 'testDB' # param 
+TABLE_NAME = 'testdata' # param 
+db = mysql.connector.connect(
+  host="localhost", # param 
+  user="root", # param 
+  password="localhost", # param 
+  database=DATABASE_NAME
+)
+cursor = db.cursor()
 ENDPOINT_URL = 'http://161.200.92.135/projects/faceapi/detect'
+
+# set up code (first use)
+# cursor.execute("CREATE DATABASE {}".format(DATABASE_NAME))
+# cursor.execute("CREATE TABLE {} (domainName VARCHAR(255), userID VARCHAR(255), embedding JSON)".format(TABLE_NAME))
 
 def computeDist(responseDict, storeEmbeddings, storeLabels, DECISION_THRES=0.85):
     responseEmbedding = np.array([face['embedding'] for face in responseDict['faces']])
@@ -46,7 +53,7 @@ async def handle_post_check(request):
             domainName = await part.text()
     if filedata is None or not userID or not domainName:
         return web.json_response({'status': 'ERR_INVALID_REQUEST',
-        'message': 'Invalid Input.'})
+        'message': 'Require image, userID and domainName.'})
     else:
         return web.json_response({}) # TODO check
 
@@ -67,17 +74,32 @@ async def handle_post_register(request):
         elif part.name == 'domainName':
             domainName = await part.text()
     if filedata is None or not userID or not domainName:
-        return web.json_response({'status': 'ERR_INVALID_REQUEST',
-        'message': 'Invalid Input.'})
+        return web.HTTPBadRequest(reason='Require image, userID and domainName.')
     else:
-        async with ClientSession() as session:
-            async with session.post(ENDPOINT_URL, data={'image':filedata}) as resp:
-                if resp.status == 200: 
-                    r = await resp.json()
-                    # cursor.execute("") # TODO register + check if available
-                    return web.json_response({'status': r['status']})
-                else:
-                    return web.json_response({'status': resp.status})
+        regCheck = "SELECT * FROM {} WHERE domainName = %s AND userID = %s".format(TABLE_NAME)
+        cursor.execute(regCheck, (domainName, userID))
+        result = cursor.fetchone()
+        if not result:
+            async with ClientSession() as session:
+                async with session.post(ENDPOINT_URL, data={'image':filedata}) as resp:
+                    if resp.status == 200: 
+                        r = await resp.json()
+                        if r['status'] != 'OK':
+                            return web.HTTPBadRequest(reason='API Error')  
+                        elif len(r['faces']) == 1:
+                            embedding = r['faces'][0]['embedding']
+                            sql = "INSERT INTO {} (domainName, userID, embedding) VALUES (%s, %s, %s)".format(TABLE_NAME)
+                            val = (domainName, userID, json.dumps(embedding))
+                            cursor.execute(sql, val)                   
+                            db.commit()     
+                            return web.json_response({'status': r['status']})
+                        else:
+                            return web.HTTPBadRequest(reason='{} people found.'.format(len(r['faces'])))
+                    else:
+                        return web.HTTPBadRequest(reason='API status : {}'.format(resp.status))           
+        else:
+            return web.HTTPBadRequest(reason='already registered')
+
 
 @routes.post('/update')
 async def handle_post_update(request):
@@ -97,7 +119,7 @@ async def handle_post_update(request):
             domainName = await part.text()
     if filedata is None or not userID or not domainName:
         return web.json_response({'status': 'ERR_INVALID_REQUEST',
-        'message': 'Invalid Input.'})
+        'message': 'Require image, userID and domainName.'})
     else:
         async with ClientSession() as session:
             async with session.post(ENDPOINT_URL, data={'image':filedata}) as resp:
