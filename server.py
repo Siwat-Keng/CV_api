@@ -3,6 +3,7 @@ from scipy.spatial.distance import cdist
 import mysql.connector, numpy as np, json
 
 routes = web.RouteTableDef()
+<<<<<<< HEAD
 DATABASE_NAME = 'testDB' # param 
 TABLE_NAME = 'testdata' # param 
 db = mysql.connector.connect(
@@ -12,6 +13,18 @@ db = mysql.connector.connect(
   database=DATABASE_NAME
 )
 cursor = db.cursor()
+=======
+# db = mysql.connector.connect(
+#   host = "localhost",
+#   user = "root",
+#   password = "password",
+#   database = "cvapi",
+#   port = 3306
+# )
+
+# cursor = db.cursor()
+# cursor.execute("CREATE TABLE")
+>>>>>>> 495e3cdd9a2a4f98b9918bfdb80b258204253731
 ENDPOINT_URL = 'http://161.200.92.135/projects/faceapi/detect'
 
 # set up code (first use)
