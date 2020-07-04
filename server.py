@@ -36,7 +36,7 @@ async def handle_post_check(request):
         elif part.name == 'domainName':
             domainName = await part.text()
         elif part.name == 'thres':
-           decisionThres = int(await part.text())
+           decisionThres = float(await part.text())
     if filedata is None or not userID or not domainName:
         return web.HTTPBadRequest(reason='Require image, userID and domainName.')
     else:
@@ -51,9 +51,13 @@ async def handle_post_check(request):
                         r = await resp.json()
                         if r['status'] != 'OK':               
                             return web.HTTPBadRequest(reason='API Error')  
-                        elif len(r['faces']) == 1:
-                            embedding = np.array([r['faces'][0]['embedding']])
-                            return web.json_response({'result': str(np.min(cdist(embedding, result), axis=1)[0] <= decisionThres)})    
+                        elif len(r['faces']) >= 1:
+                            embeddings = np.array([face['embedding'] for face in r['faces']])
+                            dist2Store = cdist(embeddings, result)
+                            minDist = np.min(dist2Store, axis=0)[0]
+                            if minDist <= decisionThres:
+                                return web.json_response({'result': True}) 
+                            return web.json_response({'result': False}) 
                         else:
                             return web.HTTPBadRequest(reason='{} faces found.'.format(len(r['faces'])))             
                     else:
