@@ -189,7 +189,7 @@ async def handle_post_update(request):
         else:
             return web.HTTPNotFound()
 
-# Require userID, domainName(json)
+# Require json userID(string), domainName(string)
 @routes.delete('/delete')
 async def handle_delete(request):
     try:
@@ -213,6 +213,21 @@ async def handle_delete(request):
     # error occure return error message to client
     except Exception as err:
         return web.HTTPBadRequest(reason=str(err)) 
+
+# Require json userID(string), domainName(string)
+@routes.get('/register')
+async def handle_post_register(request):
+    js = await request.json()
+    userID = js['userID']
+    domainName = js['domainName']
+    check = "SELECT * FROM {} WHERE domainName = %s AND userID = %s".format(TABLE_NAME)
+    cursor.execute(check, (domainName, userID))
+    result = cursor.fetchone()   
+    # check if account already registered 
+    if result:
+        return web.json_response({'status':'OK'})
+    else:
+        return web.json_response({'status':'Not Found'})
 
 app = web.Application()
 app.add_routes(routes)
