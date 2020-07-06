@@ -1,4 +1,4 @@
-from aiohttp import web, MultipartReader, ClientSession
+from aiohttp import web, ClientSession
 from scipy.spatial.distance import cdist
 import mysql.connector, numpy as np, json
 
