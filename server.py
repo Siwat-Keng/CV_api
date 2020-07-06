@@ -216,7 +216,7 @@ async def handle_delete(request):
 
 # Require json userID(string), domainName(string)
 @routes.get('/register')
-async def handle_post_register(request):
+async def handle_get_register(request):
     js = await request.json()
     userID = js['userID']
     domainName = js['domainName']

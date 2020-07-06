@@ -9,7 +9,7 @@ json = {'userID':'user1', 'domainName': 'domain1'}
 
 # r = requests.get('http://localhost:8080/register', json=json)
 
-r = requests.post('http://localhost:8080/check', files=img)
+# r = requests.post('http://localhost:8080/check', files=img)
 
 # r = requests.post('http://localhost:8080/update', files=img)
 
