@@ -31,7 +31,7 @@ async def handle_post_check(request):
     filedata = None
     userID = None
     domainName = None
-    decisionThres = 0.85
+    decisionThres = 1.1
     # read all parts
     while True:
         part = await reader.next()
@@ -61,7 +61,7 @@ async def handle_post_check(request):
                     if resp.status == 200: 
                         r = await resp.json()
                         # check if API can not progress
-                        if r['status'] != 'OK':               
+                        if r['status'] != 'OK':          
                             return web.HTTPBadRequest(reason='API Error')  
                         # check number of faces
                         elif len(r['faces']) >= 1:

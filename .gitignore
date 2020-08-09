@@ -1,5 +1,9 @@
 # created by virtualenv automatically
+/__pycache__/*
+/build/*
+/dist/*
 /Lib/*
 /Scripts/*
 /.vscode/*
 *.cfg
+*.spec
