@@ -1,6 +1,8 @@
 from aiohttp import web, ClientSession
 from scipy.spatial.distance import cdist
-import mysql.connector, numpy as np, json
+from aiohttp_tokenauth import token_auth_middleware
+from asyncio import get_event_loop
+import mysql.connector, numpy as np, json, jwt
 
 # API route
 routes = web.RouteTableDef()
@@ -14,6 +16,7 @@ db = mysql.connector.connect(
   password="localhost", # param 
   database=DATABASE_NAME
 )
+SECRET = 'secret'
 cursor = db.cursor()
 
 # Extract Feature
@@ -49,6 +52,8 @@ async def handle_post_check(request):
     if filedata is None or not userID or not domainName:
         return web.HTTPBadRequest(reason='Require image, userID and domainName.')
     else:
+        if userID != request['user']['userID'] or domainName != request['user']['domainName']:
+            return web.HTTPForbidden(text='Token Error')     
         check = "SELECT embedding FROM {} WHERE domainName = %s AND userID = %s".format(TABLE_NAME)
         cursor.execute(check, (domainName, userID))
         result = cursor.fetchone()
@@ -104,6 +109,8 @@ async def handle_post_register(request):
     if filedata is None or not userID or not domainName:
         return web.HTTPBadRequest(reason='Require image, userID and domainName.')
     else:
+        if userID != request['user']['userID'] or domainName != request['user']['domainName']:
+            return web.HTTPForbidden(text='Token Error')        
         check = "SELECT * FROM {} WHERE domainName = %s AND userID = %s".format(TABLE_NAME)
         cursor.execute(check, (domainName, userID))
         result = cursor.fetchone()
@@ -158,6 +165,8 @@ async def handle_post_update(request):
     if filedata is None or not userID or not domainName:
         return web.HTTPBadRequest(reason='Require image, userID and domainName.')
     else:
+        if userID != request['user']['userID'] or domainName != request['user']['domainName']:
+            return web.HTTPForbidden(text='Token Error')
         check = "SELECT * FROM {} WHERE domainName = %s AND userID = %s".format(TABLE_NAME)
         cursor.execute(check, (domainName, userID))
         result = cursor.fetchone()
@@ -197,6 +206,8 @@ async def handle_delete(request):
         js = await request.json()
         userID = js['userID']
         domainName = js['domainName']
+        if userID != request['user']['userID'] or domainName != request['user']['domainName']:
+            return web.HTTPForbidden(text='Token Error')
         check = "SELECT * FROM {} WHERE domainName = %s AND userID = %s".format(TABLE_NAME)
         cursor.execute(check, (domainName, userID))
         result = cursor.fetchone()   
@@ -220,6 +231,8 @@ async def handle_get_register(request):
     js = await request.json()
     userID = js['userID']
     domainName = js['domainName']
+    if userID != request['user']['userID'] or domainName != request['user']['domainName']:
+            return web.HTTPForbidden(text='Token Error')
     check = "SELECT * FROM {} WHERE domainName = %s AND userID = %s".format(TABLE_NAME)
     cursor.execute(check, (domainName, userID))
     result = cursor.fetchone()   
@@ -229,6 +242,22 @@ async def handle_get_register(request):
     else:
         return web.json_response({'status':'Not Found'})
 
-app = web.Application()
-app.add_routes(routes)
-web.run_app(app)
+async def init():
+
+    async def user_loader(token: str):
+        try:
+            user = { k:v for k, v in jwt.decode(token, SECRET, algorithms=['HS256']).items() if k in ('userID', 'domainName') }
+            if 'userID' not in user or 'domainName' not in user:
+                user = None
+        except:
+            user = None
+        finally:
+            return user
+
+    app = web.Application(middlewares=[token_auth_middleware(user_loader)])
+    app.add_routes(routes)
+    return app
+
+if __name__ == '__main__':
+    loop = get_event_loop()
+    web.run_app(loop.run_until_complete(init()))
