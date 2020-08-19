@@ -3,22 +3,26 @@ from scipy.spatial.distance import cdist
 from aiohttp_tokenauth import token_auth_middleware
 from asyncio import get_event_loop
 from aiomysql import connect
+from dotenv import load_dotenv
+from os import getenv
 import numpy as np, json, jwt
 
 # API route
 routes = web.RouteTableDef()
 
+load_dotenv()
+
 # Database
-DATABASE_NAME = 'testDB'
-TABLE_NAME = 'testdata'
-HOST = 'localhost'
-USER = 'root'
-PASSWORD = 'localhost'
-PORT = 3306
-SECRET = 'secret'
+DATABASE_NAME = getenv('DATABASE_NAME')
+TABLE_NAME = getenv('TABLE_NAME')
+HOST = getenv('HOST')
+USER = getenv('USER')
+PASSWORD = getenv('PASSWORD')
+PORT = int(getenv('PORT'))
+SECRET = getenv('SECRET')
 
 # Extract Feature
-ENDPOINT_URL = 'http://161.200.92.135/projects/faceapi/detect'
+ENDPOINT_URL = getenv('ENDPOINT_URL')
 
 # set up code
 # cursor.execute("CREATE DATABASE {}".format(DATABASE_NAME))
