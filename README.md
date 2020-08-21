@@ -1,2 +1,9 @@
-"# CV_api" 
-ต้องสร้าง Schema ชื่อ "cvapi" ใน MySQL
+"# .env" 
+DATABASE_NAME=
+TABLE_NAME=
+HOST=
+USER=
+PASSWORD=
+PORT=
+SECRET=
+ENDPOINT_URL=
